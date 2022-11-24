@@ -21,7 +21,7 @@ pub const XMLNode = struct {
     alloc: std.mem.Allocator,
     parent: ?*XMLNode,
     name: []const u8,
-    tags: []xmlTag,
+    tags: std.ArrayList(xmlTag),
     contents: std.ArrayList(XMLContents),
     fn print_indent(num: usize) void {
         var count: usize = 0;
@@ -32,7 +32,7 @@ pub const XMLNode = struct {
     pub fn print(self: *XMLNode, indent: usize) void {
         print_indent(indent);
         std.debug.print("start=>[{s}]\n", .{self.name});
-        for (self.tags) |val| {
+        for (self.tags.items) |val| {
             print_indent(indent);
             std.debug.print("arg[{s}] => [{s}]\n", .{ val.name, val.val });
         }
@@ -51,7 +51,7 @@ pub const XMLNode = struct {
         std.debug.print("end=>[{s}]\n", .{self.name});
     }
     pub fn deinit(self: *XMLNode) void {
-        self.alloc.free(self.tags);
+        self.tags.deinit();
         for (self.contents.items) |c| {
             switch (c) {
                 .node => |n| {
@@ -69,7 +69,7 @@ pub const XMLNode = struct {
         AllocError,
     };
     pub fn getTag(self: *XMLNode, name: []const u8) ?[]const u8 {
-        for (self.tags) |tag| {
+        for (self.tags.items) |tag| {
             if (std.mem.eql(u8, name, tag.name)) {
                 return tag.val;
             }
@@ -200,11 +200,12 @@ pub fn ParseXML(
         .alloc = alloc,
         .parent = null,
         .name = "root",
-        .tags = try alloc.alloc(xmlTag, 0),
+        .tags = std.ArrayList(xmlTag).init(alloc),
         .contents = std.ArrayList(XMLContents).init(alloc),
     };
     var curNode: *XMLNode = rootNode;
 
+    var tags = std.ArrayList(xmlTag).init(alloc);
     while (true) {
         const point = std.mem.indexOf(u8, val[idx.count..], "<") orelse {
             break;
@@ -241,8 +242,7 @@ pub fn ParseXML(
                 //std.debug.print("starting_tag=>[{s}]\n", .{starting_tag});
                 const end_name = std.mem.indexOfAny(u8, starting_tag, std.ascii.spaces[0..]);
                 const name = if (end_name) |e| starting_tag[0..e] else starting_tag;
-
-                var tags = std.ArrayList(xmlTag).init(alloc);
+                tags.clearRetainingCapacity();
                 if (end_name) |e| {
                     const tag_area = std.mem.trim(
                         u8,
@@ -273,7 +273,7 @@ pub fn ParseXML(
                         .alloc = alloc,
                         .parent = curNode,
                         .name = name,
-                        .tags = tags.items,
+                        .tags = try tags.clone(),
                         .contents = std.ArrayList(XMLContents).init(alloc),
                     };
                     try curNode.contents.append(.{
@@ -286,7 +286,7 @@ pub fn ParseXML(
                         .alloc = alloc,
                         .parent = curNode,
                         .name = name,
-                        .tags = tags.items,
+                        .tags = try tags.clone(),
                         .contents = std.ArrayList(XMLContents).init(alloc),
                     };
                     try curNode.contents.append(.{
