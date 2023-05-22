@@ -88,7 +88,7 @@ pub const XMLNode = struct {
             if (self.curNode) |cn| {
                 queryIdx = self.query.len - 1;
                 if (cn.parent) |p| {
-                    for (p.contents.items) |c, idx| {
+                    for (p.contents.items, 0..) |c, idx| {
                         switch (c) {
                             .node => |n| {
                                 if (n == cn) {
@@ -129,7 +129,7 @@ pub const XMLNode = struct {
                 }
                 queryIdx -= 1;
                 if (curNode.parent) |p| {
-                    for (p.contents.items) |c, idx| {
+                    for (p.contents.items, 0..) |c, idx| {
                         switch (c) {
                             .node => |n| {
                                 if (n == curNode) {
@@ -186,10 +186,28 @@ const Counter = struct {
     }
 };
 
+const TextIter = struct {
+    text: []const u8,
+    curPos: usize = 0,
+    pub fn until(self: *TextIter, item: []const u8) ?[]const u8 {
+        const point = std.mem.indexOf(u8, self.text[self.curPos..], "<") orelse {
+            return null;
+        };
+        defer self.curPos += point;
+        if (point == 0) return null;
+        return self.text[self.curPos..][0..point];
+    }
+    pub fn peekNext(self: TextIter) ?u8 {
+        if (self.curPos >= self.text.len) return null;
+        return self.text[self.curPos];
+    }
+};
+
 pub fn ParseXML(
     alloc: std.mem.Allocator,
     val: []const u8,
 ) !*XMLNode {
+    var iter = TextIter{ .text = val };
     var idx = Counter{
         .val = val,
         .count = 0,
@@ -203,32 +221,28 @@ pub fn ParseXML(
         .tags = std.ArrayList(xmlTag).init(alloc),
         .contents = std.ArrayList(XMLContents).init(alloc),
     };
+    errdefer rootNode.deinit();
     var curNode: *XMLNode = rootNode;
 
     var tags = std.ArrayList(xmlTag).init(alloc);
     while (true) {
-        const point = std.mem.indexOf(u8, val[idx.count..], "<") orelse {
-            break;
-        };
-        if (point != 0) {
+        const point = iter.until("<");
+
+        if (point) |p| {
             try curNode.contents.append(.{
-                .str = val[idx.count .. idx.count + point],
+                .str = p,
             });
         }
-        idx.increment(point, 0);
-        switch (val[idx.count + 1]) {
+        switch (iter.peekNext() orelse return error.UnexpectedEOF) {
             '?' => { //version
-                const end = std.mem.indexOf(u8, val[idx.count..], "?>") orelse return error.UnFinished;
-                idx.increment(end + 2, 1);
+                _ = iter.until("?>") orelse return error.UnFinished;
             },
-            '!' => { //comment
-                const end = std.mem.indexOf(u8, val[idx.count..], "-->") orelse return error.UnFinished;
-                idx.increment(end + 3, 2);
+            '!' => {
+                _ = iter.until("-->") orelse return error.UnFinished;
             },
             '/' => {
-                //TODO match names
-                const end = std.mem.indexOf(u8, val[idx.count..], ">") orelse return error.UnFinished;
-                idx.increment(end + 1, 3);
+                const name = iter.until(">") orelse return error.UnFinished;
+                _ = name; //TODO
                 if (curNode.parent) |c| {
                     curNode = c;
                 } else {
@@ -240,20 +254,20 @@ pub fn ParseXML(
                 const starting_tag = val[idx.count + 1 .. idx.count + 1 + end];
                 idx.increment(end + 2, 4);
                 //std.debug.print("starting_tag=>[{s}]\n", .{starting_tag});
-                const end_name = std.mem.indexOfAny(u8, starting_tag, std.ascii.spaces[0..]);
+                const end_name = std.mem.indexOfAny(u8, starting_tag, std.ascii.whitespace[0..]);
                 const name = if (end_name) |e| starting_tag[0..e] else starting_tag;
                 tags.clearRetainingCapacity();
                 if (end_name) |e| {
                     const tag_area = std.mem.trim(
                         u8,
                         starting_tag[e..],
-                        std.ascii.spaces ++ "/>",
+                        std.ascii.whitespace ++ "/>",
                     );
                     //std.debug.print("name=>({s})\tTAG_AREA[[{s}]]\n", .{ name, tag_area });
                     var tag_idx: usize = 0;
                     while (tag_idx < tag_area.len) {
                         const eql_pos = std.mem.indexOf(u8, tag_area[tag_idx..], "=") orelse return error.InvalidTag;
-                        const name_tag = std.mem.trim(u8, tag_area[tag_idx .. tag_idx + eql_pos], std.ascii.spaces[0..]);
+                        const name_tag = std.mem.trim(u8, tag_area[tag_idx .. tag_idx + eql_pos], std.ascii.whitespace[0..]);
                         const end_pos = std.mem.indexOf(u8, tag_area[tag_idx + eql_pos + 2 ..], "\"") orelse return error.InvalidTag;
                         const value_tag = tag_area[(tag_idx + eql_pos + 2)..(tag_idx + eql_pos + 2 + end_pos)];
                         try tags.append(.{
