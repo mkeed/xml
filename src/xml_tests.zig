@@ -25,12 +25,6 @@ const TestCase = struct {
 const TCs = [_]TestCase{
     .{
         .input =
-        \\<note>
-        \\  <to>Tove</to>
-        \\  <from>Jani</from>
-        \\  <heading>Reminder</heading>
-        \\  <body>Don't forget me this weekend!</body>
-        \\</note>
         ,
         .structure = .{
             .name = "note",
