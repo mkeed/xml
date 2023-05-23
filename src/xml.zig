@@ -250,9 +250,8 @@ pub fn ParseXML(
                 }
             },
             else => {
-                const end = std.mem.indexOf(u8, val[idx.count..], ">") orelse return error.UnFinished;
-                const starting_tag = val[idx.count + 1 .. idx.count + 1 + end];
-                idx.increment(end + 2, 4);
+                const end = iter.unti(">") orelse return error.UnFinished;
+                const starting_tag = end[1 .. end.len - 1];
                 //std.debug.print("starting_tag=>[{s}]\n", .{starting_tag});
                 const end_name = std.mem.indexOfAny(u8, starting_tag, std.ascii.whitespace[0..]);
                 const name = if (end_name) |e| starting_tag[0..e] else starting_tag;
@@ -281,7 +280,7 @@ pub fn ParseXML(
                 //while (end_count < 6) : (end_count += 1) {
                 //std.debug.print("|[{}={c}||\n", .{ @intCast(isize, end_count) - 3, val[idx.count + end_count - 3] });
                 //}
-                if (val[idx.count - 3] == '/') {
+                if (end[end.len - 1] == '/') {
                     var newNode = try alloc.create(XMLNode);
                     newNode.* = XMLNode{
                         .alloc = alloc,

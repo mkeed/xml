@@ -17,7 +17,7 @@ const TestCase = struct {
 
 const tcs = [_]TestCase{
     .{
-        .input = 
+        .input =
         \\<?xml version="1.0" encoding="UTF-8"?>
         \\<protocol name="wayland">
         \\</protocol>
@@ -96,9 +96,9 @@ test {
         .{ .query = &.{ "a", "b" }, .expectedResults = &.{ "14", "15" }, .tagName = "name" },
     };
 
-    for (tests) |tc, testIdx| {
+    for (tests, 0..) |tc, testIdx| {
         var iter = tree.nodesIter(tc.query);
-        for (tc.expectedResults) |r, idx| {
+        for (tc.expectedResults, 0..) |r, idx| {
             if (iter.next()) |val| {
                 const tagVal = val.getTag(tc.tagName);
                 if (tagVal) |tv| {
