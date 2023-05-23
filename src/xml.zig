@@ -190,7 +190,7 @@ const TextIter = struct {
     text: []const u8,
     curPos: usize = 0,
     pub fn until(self: *TextIter, item: []const u8) ?[]const u8 {
-        const point = std.mem.indexOf(u8, self.text[self.curPos..], "<") orelse {
+        const point = std.mem.indexOf(u8, self.text[self.curPos..], item) orelse {
             return null;
         };
         defer self.curPos += point;
@@ -203,15 +203,15 @@ const TextIter = struct {
     }
 };
 
+fn parseTags(data: []const u8, tags: *std.ArrayList(Tag)) !void {
+    tags.clearRetainingCapacity();
+}
+
 pub fn ParseXML(
     alloc: std.mem.Allocator,
     val: []const u8,
 ) !*XMLNode {
     var iter = TextIter{ .text = val };
-    var idx = Counter{
-        .val = val,
-        .count = 0,
-    };
     var rootNode = try alloc.create(XMLNode);
 
     rootNode.* = XMLNode{
@@ -225,6 +225,7 @@ pub fn ParseXML(
     var curNode: *XMLNode = rootNode;
 
     var tags = std.ArrayList(xmlTag).init(alloc);
+    defer tags.deinit();
     while (true) {
         const point = iter.until("<");
 
@@ -250,7 +251,7 @@ pub fn ParseXML(
                 }
             },
             else => {
-                const end = iter.unti(">") orelse return error.UnFinished;
+                const end = iter.until(">") orelse return error.UnFinished;
                 const starting_tag = end[1 .. end.len - 1];
                 //std.debug.print("starting_tag=>[{s}]\n", .{starting_tag});
                 const end_name = std.mem.indexOfAny(u8, starting_tag, std.ascii.whitespace[0..]);
