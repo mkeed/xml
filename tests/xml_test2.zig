@@ -5,7 +5,7 @@ const Node = struct {
     name: []const u8,
     tags: []const Tag,
     subNodes: []const SubNode,
-    pub const tag = struct {
+    pub const Tag = struct {
         name: []const u8,
         val: []const u8,
     };
@@ -21,11 +21,13 @@ const XMLTest = struct {
     expectedTree: Node,
 };
 
-fn subNode(name: []const u8, tags: []const Tag, subNodes: []const Node.SubNode) SubNode {
+fn subNode(name: []const u8, tags: []const Node.Tag, subNodes: []const Node.SubNode) Node.SubNode {
     return .{
-        .name = name,
-        .tags = tags,
-        .subNodes = subNodes,
+        .node = .{
+            .name = name,
+            .tags = tags,
+            .subNodes = subNodes,
+        },
     };
 }
 
@@ -56,7 +58,9 @@ test {
     const alloc = std.testing.allocator;
 
     for (Tests) |t| {
-        var doc = xml.ParseDocument(t.data);
+        var fbs = std.io.fixedBufferStream(t.data);
+
+        var doc = try xml.parseDocument(fbs.reader(), alloc);
         defer doc.deinit();
     }
 }

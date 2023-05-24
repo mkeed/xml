@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const modules = [_]struct { name: []const u8, path: []const u8 }{
-        .{ .name = "xml", .path = "src/xml.zig" },
+        .{ .name = "xml", .path = "src/xml2.zig" },
     };
     for (modules) |m| {
         const mod = b.createModule(.{ .source_file = .{ .path = m.path } });
